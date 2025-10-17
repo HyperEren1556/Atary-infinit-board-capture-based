@@ -90,7 +90,7 @@
   const keys = {}; // keyboard state
   const speedUnitsPerSecond = 6; // camera pan speed
   const placedBalls = []; // all placed grid points
-  const deadspace = []; //captured empty space, to prevent placing new points
+  const deadspace = []; //global array to collect enclosed empty coordinates, to prevent placing new points
   const enclosures = [];
   let nextPlayer = 1; // 1 or 2, determines next turn
   const undoStack = []; // history of moves for undo
@@ -100,19 +100,23 @@
   let panLast = null; // last pan mouse position
   
   //scores
-  let p1Score = 0
-  let p2Score = 0
-  let p3Score = 0
-  let p4Score = 0
 
   // === PLAYER SETTINGS ===
-  const settingsState = {
-    p1: { color: '#ff0000', shape: 'circle' },
-    p2: { color: '#3b82f6', shape: 'square' },
-    p3: { color: '#00ff00', shape: 'triangle' },
-    p4: { color: '#ffed29', shape: 'pentagon' }
+  class Player {
+    constructor(id, color, shape, score){ this.id = id; this.color = color; this.shape = shape; this.score = score }
+  }
+  // By default the game uses 2 players (but definitions for up to 4 exist)
+  let playerCount = 2; // configurable later if desired (max 4)
+  const players = []
+  const defaultPlayers = {
+    1: { color: '#ff0000', shape: 'circle', score:0 },
+    2: { color: '#3b82f6', shape: 'square', score:0 },
+    3: { color: '#00ff00', shape: 'triangle', score:0 },
+    4: { color: '#7f00ff', shape: 'pentagon', score:0 }
   };
+  for(let i=1;i<=4;i++) players.push(new Player(i, defaultPlayers[i].color, defaultPlayers[i].shape, defaultPlayers[i].score));
 
+  updateCurrentPlayer()
   // === COORDINATE CONVERSION FUNCTIONS ===
   function worldToScreen(wx, wy){
     const cx = canvas.clientWidth/2;
@@ -152,7 +156,7 @@
     const axisY = Math.round(worldToScreen(0,0).y)+0.5; ctx.beginPath(); ctx.moveTo(0,axisY); ctx.lineTo(w,axisY); ctx.stroke();
   }
 
-
+  // drawColoredPolygon(points, color): provided drawing function
   function drawColoredPolygon(points, color="#808080") {
     if (points.length < 3) return; // need at least a triangle
 
@@ -300,11 +304,11 @@
 
     // Draw hovered preview if empty position
     const occupied = placedBalls.some(b=>b.x===hoverSnap.x && b.y===hoverSnap.y);
-    const pref = nextPlayer===1 ? settingsState.p1 : settingsState.p2;
-    if(!occupied) drawShapeAtWorld(hoverSnap.x,hoverSnap.y,size,pref.shape,pref.color,false);
+    //preview point
+    if(!occupied) drawShapeAtWorld(hoverSnap.x,hoverSnap.y,size,players[currentPlayer].shape,players[currentPlayer].color,false);
     if (enclosures.length > 0){
       enclosures.forEach(element => {
-        drawColoredPolygon(element[0],settingsState['p' + element[1]].color);
+        drawColoredPolygon(element[0],players[element[1]].color);
       });
     };
 
@@ -387,15 +391,9 @@
   window.addEventListener('mouseup', e=>{ if(e.button===2){ isPanning=false; panLast=null; } });
 
   // === GAME LOGIC: PLACE, UNDO, REDO ===
-  function placeAt(world){
+  
 
-
-// placedBalls: global array of all points
-// deadspace: global array to collect enclosed empty coordinates
-// drawColoredPolygon(points, color): provided drawing function
-
-
-
+  //calculates if you captured something
   function detectCapture() {
     if (placedBalls.length < 7) return null;
 
@@ -546,6 +544,10 @@
         placedBalls.forEach(ball => {
           if (enemies.some(([x, y]) => ball.x === x && ball.y === y)) {
             ball.alive = false;
+            if (ball.color !== players[currentPlayer].color){
+              //add score
+              players[currentPlayer].score++;
+              };
           }
         });
 
@@ -559,20 +561,19 @@
         // register the capture walls
         enclosures.push([walls,player]);
 
-        //add score
-
       }
     }
 
     return captureFound ? "captured" : null;
   }
 
+  function updateCurrentPlayer(){
+    currentPlayer = currentPlayerIndex();
+    nextPlayere = currentPlayerIndex(1);
+  }
+function placeAt(world){
 
-
-
-
-
-
+  updateCurrentPlayer()
 
 
 
@@ -586,18 +587,21 @@
       deadspace.some(d => d[0] === sx && d[1] === sy)
     ) return;
 
-    const pref = nextPlayer===1 ? settingsState.p1 : settingsState.p2;
-    const ball = {x:sx,y:sy,player:nextPlayer,color:pref.color,shape:pref.shape,alive: true};
+
+    //set point onn board
+    const ball = {x:sx,y:sy,player:currentPlayer,color:players[currentPlayer].color,shape:players[currentPlayer].shape,alive: true};
     placedBalls.push(ball);
     const captures = detectCapture();
     console.log(JSON.stringify(captures, null, 2));
-    console.log(enclosures)
-    console.log(settingsState[`p1`])
     // Save move to undo history
     undoStack.push({type:'add',ball}); redoStack.length=0;
+    
+    counter++
+    updateCurrentPlayer()
 
     // Switch player turn
     nextPlayer = nextPlayer===1?2:1;
+    
   }
 
   function undo(){
@@ -609,10 +613,13 @@
         if(b.x===action.ball.x && b.y===action.ball.y && b.player===action.ball.player){
           placedBalls.splice(i,1);
           redoStack.push(action);
+          counter-=1
+          updateCurrentPlayer()
           break;
         }
       }
     }
+    print
   }
 
   function redo(){
@@ -621,8 +628,20 @@
     if(action.type==='add'){
       placedBalls.push(action.ball);
       undoStack.push(action);
+      counter++
+      updateCurrentPlayer()
     }
+    
   }
+
+
+
+  // Counter logic
+
+  function currentPlayerIndex(extra=0){ return ((counter+extra) % playerCount); } // 0-based index into players array
+  //function currentPlayer(){ return players[currentPlayerIndex()]; }
+
+
   //to fix:
 
   //when double connection is formed, save the space in between in the deadspace
@@ -634,30 +653,11 @@
 
 
 
-  //fix the player switch, replace the curent function responsible for that, make sure you can add new players,
-  //add the default setting array, change the name of settingState
-  //edit all the variables player and currentPlayer in the code
-  //use code from Dots-1
 
-  //make sure player can't place on deadspace points, so put a control every time player tries to put a point, check if it's present in the list.
+
+
   
 
-  //score display
-  //count the the number of captured points(and ignore the deads) and then add it to the current player score
-  //record in the history the enclosure, the captured points, the score added
-
-
-  //wasd and arrow movement is scalled to the zoom quantity
-  //add a score display on the top of the screen,
-  //export
-  //import
-  //save
-  //popups
-
-
-  //DONE:
-  //eliminate the manual capture botton and it's html,javascript and style fragments
-  //make sure you can not put points in deadspace area
 
 
 
