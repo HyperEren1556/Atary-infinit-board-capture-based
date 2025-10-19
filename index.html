@@ -321,10 +321,19 @@
 
     // Handle camera keyboard movement
     let dx=0,dy=0;
-    if(keys['ArrowLeft']||keys['a']) dx-=1;
-    if(keys['ArrowRight']||keys['d']) dx+=1;
-    if(keys['ArrowUp']||keys['w']) dy+=1;
-    if(keys['ArrowDown']||keys['s']) dy-=1;
+    // Scale keyboard panning so it feels consistent regardless of zoom level
+    const panSpeed = speedUnitsPerSecond / scale;
+    if (keys['ArrowLeft'] || keys['a']) dx -= 1;
+    if (keys['ArrowRight'] || keys['d']) dx += 1;
+    if (keys['ArrowUp'] || keys['w']) dy += 1;
+    if (keys['ArrowDown'] || keys['s']) dy -= 1;
+
+    if (dx || dy) {
+      const len = Math.hypot(dx, dy) || 1;
+      camera.x += (dx / len) * panSpeed * dt;
+      camera.y += (dy / len) * panSpeed * dt;
+    }
+
     if(dx||dy){ const len = Math.hypot(dx,dy)||1;
     camera.x += (dx/len)*speedUnitsPerSecond*dt;
     camera.y += (dy/len)*speedUnitsPerSecond*dt; }
@@ -390,8 +399,49 @@
 
   window.addEventListener('mouseup', e=>{ if(e.button===2){ isPanning=false; panLast=null; } });
 
-  // === GAME LOGIC: PLACE, UNDO, REDO ===
-  
+    // === TOUCH GESTURES (Two-finger Pan & Zoom) ===
+  let touchState = { active: false, startDist: 0, startScale: 1, startCenter: { x: 0, y: 0 }, startCam: { x: 0, y: 0 } };
+
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      touchState.active = true;
+      const [t1, t2] = e.touches;
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      touchState.startDist = Math.hypot(dx, dy);
+      touchState.startScale = scale;
+      touchState.startCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+      touchState.startCam = { ...camera };
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    if (touchState.active && e.touches.length === 2) {
+      e.preventDefault();
+      const [t1, t2] = e.touches;
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      const newDist = Math.hypot(dx, dy);
+      const zoomFactor = newDist / touchState.startDist;
+
+      // Calculate new zoom
+      const newScale = Math.max(0.08, Math.min(8, touchState.startScale * zoomFactor));
+      const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+
+      // Convert to world coordinates for stable panning
+      const before = screenToWorld(touchState.startCenter.x, touchState.startCenter.y);
+      scale = newScale;
+      const after = screenToWorld(center.x, center.y);
+      camera.x = touchState.startCam.x + (before.x - after.x);
+      camera.y = touchState.startCam.y + (before.y - after.y);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    if (e.touches.length < 2) touchState.active = false;
+  }, { passive: false });
+
 
   //calculates if you captured something (instrumented with debug logs)
   function detectCapture() {
@@ -685,6 +735,9 @@
     currentPlayer = currentPlayerIndex();
     nextPlayere = currentPlayerIndex(1);
   }
+
+
+  // === GAME LOGIC: PLACE, UNDO, REDO ===
 function placeAt(world){
 
   updateCurrentPlayer()
@@ -750,6 +803,7 @@ function placeAt(world){
     }
     
   }
+
 
 
   // Counter logic
