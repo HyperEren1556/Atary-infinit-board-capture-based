@@ -393,57 +393,76 @@
   // === GAME LOGIC: PLACE, UNDO, REDO ===
   
 
-  //calculates if you captured something
+  //calculates if you captured something (instrumented with debug logs)
   function detectCapture() {
-    if (placedBalls.length < 7) return null;
+    console.log('--- detectCapture START ---');
+    if (placedBalls.length < 6) { console.log('Too few balls placed:', placedBalls.length); return null; }
 
     const lastPlaced = placedBalls[placedBalls.length - 1];
+    console.log('Last placed:', lastPlaced);
+    const playerId = lastPlaced.player; // numeric player id as stored on ball
     const color = lastPlaced.color;
-    const player = lastPlaced.player;
 
     const key = (x, y) => `${x},${y}`;
-    const parseKey = k => k.split(',').map(Number);
 
-    // Map of alive points only
+    // map of alive balls by position
     const pos2ball = new Map();
-    for (const b of placedBalls) {
-      if (b.alive) pos2ball.set(key(b.x, b.y), b);
+    for (const b of placedBalls) if (b.alive) pos2ball.set(key(b.x, b.y), b);
+    console.log('Alive balls map size:', pos2ball.size);
+
+    // quick list of same-color alive nodes
+    const sameColor = placedBalls.filter(p => p.alive && p.color === color).map(p => [p.x, p.y]);
+    console.log('Same-color alive nodes:', sameColor);
+    if (sameColor.length < 4) { console.log('Not enough same-color stones for enclosure:', sameColor.length); return null; }
+
+    const nodeSet = new Set(sameColor.map(([x, y]) => key(x, y)));
+
+    // helper checks
+    function checkValidity(x, y, pid) {
+      const k = key(x, y);
+      const pt = pos2ball.get(k);
+      const res = !!pt && pt.player === pid && pt.alive;
+      console.log(`checkValidity(${x},${y},pid=${pid}) ->`, res, 'point=', pt);
+      return res;
     }
+    function isEmpty(x, y) { const e = !pos2ball.has(key(x, y)); console.log(`isEmpty(${x},${y}) ->`, e); return e; }
 
-    // connection rule
-    function isConnected(a, b) {
-      const dx = a[0] - b[0], dy = a[1] - b[1];
-      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) return true;
-      if (Math.abs(dx) === 2 && dy === 0) {
-        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-        return !pos2ball.has(key(mx, my));
-      }
-      if (Math.abs(dy) === 2 && dx === 0) {
-        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-        return !pos2ball.has(key(mx, my));
-      }
-      return false;
-    }
+    // direction vectors (codes 1..16)
+    const dirVec = {
+      1: [1, 1],   2: [1, -1], 3: [-1, -1], 4: [-1, 1],
+      5: [1, 0],   6: [0, 1],  7: [-1, 0],  8: [0, -1],
+      9: [2, 0],  10: [0, 2], 11: [-2, 0], 12: [0, -2],
+      13: [1, 0], 14: [0, 1], 15: [-1, 0], 16: [0, -1]
+    };
 
-    // same-color and alive nodes
-    const sameColor = placedBalls
-      .filter(p => p.alive && p.color === color)
-      .map(p => [p.x, p.y]);
-    const nodeSet = new Set(sameColor.map(([x,y]) => key(x,y)));
+    // allowed next directions per your spec
+    const allowedNext = {
+      1: [4, 6, 1, 5, 2],
+      2: [1, 5, 2, 8, 4],
+      3: [4, 7, 3, 8, 2],
+      4: [1, 3, 6, 4, 7],
+      5: [1, 5, 2],
+      6: [1, 6, 4],
+      7: [4, 7, 3],
+      8: [2, 8, 3],
+      9: [13],
+      10: [14],
+      11: [15],
+      12: [16],
+      13: [6, 1, 5, 2, 8],
+      14: [5, 1, 6, 4, 7],
+      15: [8, 4, 7, 3, 6],
+      16: [7, 2, 8, 3, 5]
+    };
 
-    // adjacency
-    const adj = new Map();
-    for (const a of sameColor) {
-      const kA = key(a[0], a[1]);
-      const neigh = [];
-      for (const b of sameColor) {
-        if (a === b) continue;
-        if (isConnected(a, b)) neigh.push(b);
-      }
-      adj.set(kA, neigh);
-    }
+    // mapping for jump intermediary: when cardinal 5..8 finds empty immediate cell, we try intermediate 9..12
+    const toIntermediary = { 5: 9, 6: 10, 7: 11, 8: 12 };
+    // mapping from intermediary (9..12) to post-jump codes (13..16)
+    const interToPost = { 9: 13, 10: 14, 11: 15, 12: 16 };
+    // mapping post-jump back to canonical cardinal parent (for clarity)
+    const postToCardinal = { 13: 5, 14: 6, 15: 7, 16: 8 };
 
-    // normalize cycles
+    // normalize cycle to canonical string to dedupe
     function normalizeCycle(cycle) {
       const n = cycle.length;
       const variants = [];
@@ -458,43 +477,137 @@
       return strs.reduce((a,b) => (a < b ? a : b));
     }
 
-    const start = [lastPlaced.x, lastPlaced.y];
-    const startKey = key(...start);
+    // iterative propagation stack
+    const origin = [lastPlaced.x, lastPlaced.y];
+    const originKey = key(...origin);
+    const maxPath = 100;
+
     const cyclesSet = new Set();
     const cycles = [];
 
-    function dfs(path) {
-      const cur = path[path.length - 1];
-      const curKey = key(...cur);
-      const neighbors = adj.get(curKey) || [];
-      for (const nb of neighbors) {
-        const nbKey = key(...nb);
-        // avoid backtrack
-        if (path.length >= 2) {
-          const prev = path[path.length - 2];
-          if (nb[0] === prev[0] && nb[1] === prev[1]) continue;
+    const stack = [];
+
+    console.log('Initializing stack from origin', origin);
+    // push initial directions from origin (origin can try all 1..8)
+    for (let dir = 1; dir <= 8; dir++) {
+      const [dx, dy] = dirVec[dir];
+      const nx = origin[0] + dx, ny = origin[1] + dy;
+      console.log('Origin trying dir', dir, '->', nx, ny);
+      if (checkValidity(nx, ny, playerId)) {
+        console.log(' -> valid neighbor, pushing path', [[...origin], [nx, ny]], 'dir', dir);
+        stack.push({ path: [[...origin], [nx, ny]], dir });
+      } else if ((dir >= 5 && dir <= 8) && isEmpty(nx, ny)) {
+        // try intermediary double-step from origin
+        const dx2 = dx * 2, dy2 = dy * 2;
+        const jx = origin[0] + dx2, jy = origin[1] + dy2;
+        console.log(' -> immediate empty, trying jump to', jx, jy);
+        if (checkValidity(jx, jy, playerId)) {
+          const inter = toIntermediary[dir];
+          const post = interToPost[inter];
+          console.log(' -> jump valid, pushing path', [[...origin], [jx, jy]], 'intermediate dir', inter, 'post->', post);
+          // set dir to post-jump (13..16) to continue from that landed cell
+          stack.push({ path: [[...origin], [jx, jy]], dir: post });
         }
-        const idx = path.findIndex(([x,y]) => x === nb[0] && y === nb[1]);
-        if (idx !== -1) {
-          const cyc = path.slice(idx);
-          if (cyc.length >= 4) {
-            const norm = normalizeCycle(cyc);
-            if (!cyclesSet.has(norm)) {
-              cyclesSet.add(norm);
-              cycles.push(cyc);
-            }
-          }
-          continue;
-        }
-        if (path.length > 40) continue;
-        dfs([...path, nb]);
       }
     }
 
-    if (nodeSet.has(startKey)) dfs([start]);
-    if (cycles.length === 0) return null;
+    console.log('Initial stack size:', stack.length);
 
-    // point in polygon
+    // Explore iteratively
+    while (stack.length) {
+      const node = stack.pop();
+      const path = node.path;
+      const cur = path[path.length - 1];
+      const curKey = key(...cur);
+
+      console.log('Popped node. Path length:', path.length, 'Path:', path, 'dir:', node.dir);
+
+      if (path.length > maxPath) { console.log('Path too long, skipping'); continue; }
+
+      const dir = node.dir;
+      const nextDirs = allowedNext[dir] || [];
+
+      for (const nd of nextDirs) {
+        // compute basic step vector for nd (if nd is 9..12 or 13..16 this vector exists in dirVec)
+        const vec = dirVec[nd];
+        if (!vec) { console.log(' No vector for nd', nd); continue; }
+        let tx = cur[0] + vec[0], ty = cur[1] + vec[1];
+
+        console.log(' Considering nd', nd, '-> target', tx, ty, '(from cur', cur, ')');
+
+        // If nd is 13..16 (post-jump) we already landed after a jump and should use normal neighbor handling
+        // If nd is 5..8 (cardinal) and immediate cell is empty from cur, attempt intermediary jump to 9..12 -> post
+        if (nd >= 5 && nd <= 8) {
+          // immediate target tx,ty is the adjacent cell in that cardinal direction
+          if (isEmpty(tx, ty)) {
+            // attempt jump to double cell
+            const inter = toIntermediary[nd];       // 9..12
+            const post = interToPost[inter];       // 13..16
+            const dx2 = dirVec[inter][0], dy2 = dirVec[inter][1];
+            const jx = cur[0] + dx2, jy = cur[1] + dy2;
+            console.log('  Immediate cell empty, considering jump to', jx, jy, 'intermediate', inter, 'post->', post);
+            if (checkValidity(jx, jy, playerId)) {
+              // check if we formed cycle with jump target
+              const alreadyIndex = path.findIndex(([x,y]) => x===jx && y===jy);
+              if (alreadyIndex !== -1) {
+                const cyc = path.slice(alreadyIndex);
+                console.log('  Found cycle via jump:', cyc);
+                if (cyc.length >= 4) {
+                  const norm = normalizeCycle(cyc);
+                  if (!cyclesSet.has(norm)) { cyclesSet.add(norm); cycles.push(cyc); console.log('   -> Added normalized cycle', norm); }
+                }
+              } else {
+                const prev = path.length >=2 ? path[path.length-2] : null;
+                if (prev && prev[0] === jx && prev[1] === jy) { console.log('  Jump would backtrack to parent, skipping jump'); }
+                else {
+                  console.log('  Pushing jump to stack:', jx, jy, 'with post-dir', post);
+                  stack.push({ path: [...path, [jx, jy]], dir: post });
+                }
+              }
+            } else {
+              console.log('  Jump target invalid or not same-color/alive');
+            }
+            // do not try moving into the empty immediate cell as a normal neighbor
+            continue;
+          }
+        }
+
+        // For intermediaries nd in 9..12 (if ever encountered directly), interpret as a jump target already:
+        // handled by checking validity below (tx,ty will be double-step cell)
+        // For all cases, perform validity check
+        if (checkValidity(tx, ty, playerId)) {
+          const alreadyIndex = path.findIndex(([x,y]) => x===tx && y===ty);
+          if (alreadyIndex !== -1) {
+            // cycle found
+            const cyc = path.slice(alreadyIndex);
+            console.log('  Found cycle via normal neighbor:', cyc);
+            if (cyc.length >= 4) {
+              const norm = normalizeCycle(cyc);
+              if (!cyclesSet.has(norm)) { cyclesSet.add(norm); cycles.push(cyc); console.log('   -> Added normalized cycle', norm); }
+            }
+          } else {
+            // avoid immediate backtrack to parent
+            const prev = path.length >=2 ? path[path.length-2] : null;
+            if (prev && prev[0] === tx && prev[1] === ty) { console.log('  Would backtrack to parent, skipping'); continue; }
+
+            // If nd is intermediary (9..12) we should continue using the corresponding post-jump code
+            let pushDir = nd;
+            if (nd >= 9 && nd <= 12) { pushDir = interToPost[nd]; }
+
+            // If nd is post-jump 13..16, we may want to use its mapped allowedNext already (we are already doing so)
+            console.log('  Pushing neighbor to stack:', tx, ty, 'dir->', pushDir);
+            stack.push({ path: [...path, [tx, ty]], dir: pushDir });
+          }
+        } else {
+          console.log('  Neighbor invalid:', tx, ty);
+        }
+      } // end for nextDirs
+    } // end while stack
+
+    console.log('Finished exploration. Cycles found:', cycles.length);
+    if (cycles.length === 0) { console.log('No cycles -> no capture'); return null; }
+
+    // point-in-polygon test (same as before)
     function pointInPoly(x, y, poly) {
       let inside = false;
       for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -507,65 +620,66 @@
       return inside;
     }
 
-    let captureFound = false;
-
+    // For each cycle get enemies inside
+    let totalCaptured = 0;
     for (const cyc of cycles) {
-      const walls = cyc;
-      const wallsSet = new Set(walls.map(([x,y]) => key(x,y)));
-
-      const enemies = [];
-      const empties = [];
-
-      // bounding box
+      console.log('Processing cycle:', cyc);
+      const wallsSet = new Set(cyc.map(([x,y]) => key(x,y)));
       const xs = cyc.map(p => p[0]), ys = cyc.map(p => p[1]);
       const minX = Math.min(...xs) - 1, maxX = Math.max(...xs) + 1;
       const minY = Math.min(...ys) - 1, maxY = Math.max(...ys) + 1;
-
+      const enemies = [];
+      const empties = [];
       for (let y = minY; y <= maxY; y++) {
         for (let x = minX; x <= maxX; x++) {
-          const k = key(x,y);
+          const k = key(x, y);
           if (wallsSet.has(k)) continue;
           if (pointInPoly(x, y, cyc)) {
             const ball = pos2ball.get(k);
             if (ball) {
-              if (ball.color !== color && ball.alive) enemies.push([x,y]);
+              if (ball.player !== playerId && ball.alive) enemies.push([x, y]);
             } else {
-              empties.push([x,y]);
+              empties.push([x, y]);
             }
           }
         }
       }
 
-      // only capture if there is at least one alive enemy inside
-      if (enemies.length > 0) {
-        captureFound = true;
+      console.log(' enemies found in cycle:', enemies, 'empties:', empties.length);
 
-        // mark captured as dead
-        placedBalls.forEach(ball => {
-          if (enemies.some(([x, y]) => ball.x === x && ball.y === y)) {
-            ball.alive = false;
-            if (ball.color !== players[currentPlayer].color){
-              //add score
-              players[currentPlayer].score++;
-              };
+      if (enemies.length === 0) { console.log(' No enemies inside, skipping cycle'); continue; }
+
+      // mark captured
+      for (const [ex, ey] of enemies) {
+        for (const b of placedBalls) {
+          if (b.x === ex && b.y === ey && b.alive) {
+            console.log(' Capturing ball at', ex, ey, b);
+            b.alive = false;
+            // award score to current player
+            players[playerId].score = (players[playerId].score || 0) + 1;
+            totalCaptured++;
           }
-        });
-
-        // add empty inside points to deadspace
-        empties.forEach(pt => {
-          if (!deadspace.some(([x,y]) => x === pt[0] && y === pt[1])) {
-            deadspace.push(pt);
-          }
-        });
-
-        // register the capture walls
-        enclosures.push([walls,player]);
-
+        }
       }
+
+      // add empties to deadspace
+      for (const pt of empties) if (!deadspace.some(([x,y]) => x===pt[0] && y===pt[1])) {
+        console.log(' Adding empty inside to deadspace', pt);
+        deadspace.push(pt);
+      }
+
+      // register enclosure and draw polygon
+      console.log(' Registering enclosure and drawing polygon for player', playerId);
+      enclosures.push([cyc, playerId]);
+      drawColoredPolygon(cyc, players[playerId].color);
     }
 
-    return captureFound ? "captured" : null;
+    console.log('Total captured this move:', totalCaptured);
+    console.log('--- detectCapture END ---');
+    return totalCaptured > 0 ? { captured: totalCaptured, cycles } : null;
   }
+
+
 
   function updateCurrentPlayer(){
     currentPlayer = currentPlayerIndex();
@@ -574,6 +688,9 @@
 function placeAt(world){
 
   updateCurrentPlayer()
+
+
+
 
 
 
@@ -635,28 +752,11 @@ function placeAt(world){
   }
 
 
-
   // Counter logic
 
   function currentPlayerIndex(extra=0){ return ((counter+extra) % playerCount); } // 0-based index into players array
   //function currentPlayer(){ return players[currentPlayerIndex()]; }
 
-
-  //to fix:
-
-  //when double connection is formed, save the space in between in the deadspace
-  //integrate the enclosure in the undo and redo function
-  //fix the capture function: it creates a 2 lenght conection over the dead points
-  //shotest possible way to create a capture?
-  //or create a function that calculates if a line is already create then don't draw the line
-  //or unite the polygons
-
-
-
-
-
-
-  
 
 
 
