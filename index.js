@@ -1,7 +1,7 @@
 import { undo, redo, updateCurrentPlayer, currentPlayer, placeAt } from "./undo-redo.mjs";
 import { placedBalls, deadspace, enclosures } from "./detectCapture.mjs";
 import { loadPlayers, players } from "./player.mjs";
-import { drawAll, screenToWorld, scale, camera } from "./drawAll.mjs";
+import { drawAll, screenToWorld, scale, camera, ctx } from "./drawAll.mjs";
 
 
 //#region logic
@@ -21,8 +21,8 @@ import { drawAll, screenToWorld, scale, camera } from "./drawAll.mjs";
   //#region === RESPONSIVE RESIZING FUNCTION ===
   function resize() {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(ctx.clientWidth * dpr);
-    canvas.height = Math.floor(ctx.clientHeight * dpr);
+    canvas.width = canvas.clientWidth * dpr;
+    canvas.height = canvas.clientHeight * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   window.addEventListener('resize', resize);
