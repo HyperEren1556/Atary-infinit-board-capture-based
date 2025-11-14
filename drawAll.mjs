@@ -261,7 +261,6 @@ function drawShapeAtScreen(cx, cy, pxSize, shape, color, fill = true) {
 
 // Helper: convert hex color (#RRGGBB) to {r,g,b}
 function hexToRgb(hex) {
-  console.log(canvas.width)
   hex = hex.replace("#", "");
   if (hex.length === 3) { // shorthand #f00
     hex = hex.split("").map(c => c + c).join("");
@@ -316,3 +315,4 @@ function drawUniformBorderShadow(ctx, color = "#000000", strength = 0.3, sizeCss
 
   ctx.restore();
 }
+
