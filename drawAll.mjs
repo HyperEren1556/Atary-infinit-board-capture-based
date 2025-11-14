@@ -1,6 +1,5 @@
 import { deadspace } from "./detectCapture.mjs";
-import { players } from "./player.mjs";
-import { checkOccupied, currentPlayer } from "./undo-redo.mjs";
+import { checkOccupied } from "./undo-redo.mjs";
 
 
 
@@ -8,7 +7,7 @@ import { checkOccupied, currentPlayer } from "./undo-redo.mjs";
 
 // === CANVAS & CONTEXT INITIALIZATION ===
 export const canvas = document.getElementById('c');
-export const ctx = canvas.getContext('2d');  
+export const ctx = canvas.getContext('2d');
 
 
 
@@ -26,38 +25,36 @@ let backgroundColor = "#fff"
 
 
 // === MAIN DRAW LOOP ===
-export function drawAll(placedBalls, enclosures, players, hoverSnap, currentPlayer){
-    ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
-    ctx.fillStyle = backgroundColor ;
-    ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
-    
-    drawGrid();
+export function drawAll(placedBalls, enclosures, players, hoverSnap, currentPlayer) {
+  ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  ctx.fillStyle = backgroundColor;
+  ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-    // Draw all placed points
-    for(const b of placedBalls){ drawShapeAtWorld(b.x,b.y,size,b.shape,b.color,true); }
+  drawGrid();
+
+  // Draw all placed points
+  for (const b of placedBalls) { drawShapeAtWorld(b.x, b.y, size, b.shape, b.color, true); }
 
 
 
-    // Draw hovered preview if empty position
+  // Draw hovered preview if empty position
 
-    //preview point
-    if(!(checkOccupied(placedBalls, deadspace, hoverSnap.x, hoverSnap.y))) drawShapeAtWorld(hoverSnap.x,hoverSnap.y,size,players[currentPlayer].shape,players[currentPlayer].color,false);
-    if (enclosures.length > 0){
-      enclosures.forEach(element => {
-        drawColoredPolygon(element[0],players[element[1]].color);
-    
+  //preview point
+  if (!(checkOccupied(placedBalls, deadspace, hoverSnap.x, hoverSnap.y))) drawShapeAtWorld(hoverSnap.x, hoverSnap.y, size, players[currentPlayer].shape, players[currentPlayer].color, false);
+  if (enclosures.length > 0) {
+    enclosures.forEach(element => {
+      drawColoredPolygon(element[0], players[element[1]].color);
+    });
+  };
 
-      });
+  drawUniformBorderShadow(ctx, players[currentPlayer].color, 0.3, 30);
 
-    };
-
-    drawUniformBorderShadow(ctx, players[currentPlayer].color, 0.3, size*50);
 
 }
 
 
-export function updateOccupied(){
-      const occupied = placedBalls.some(b=>b.x===hoverSnap.x && b.y===hoverSnap.y);
+export function updateOccupied() {
+  const occupied = placedBalls.some(b => b.x === hoverSnap.x && b.y === hoverSnap.y);
 }
 
 
@@ -67,172 +64,172 @@ export function updateOccupied(){
 
 
 // === DRAWING GRID ===
-function drawGrid(){
-    const w = canvas.clientWidth; const h = canvas.clientHeight;
-    const halfWUnits = (w/2) / (baseGridPx * scale);
-    const halfHUnits = (h/2) / (baseGridPx * scale);
-    const left = Math.floor(camera.x - halfWUnits) - 2;
-    const right = Math.ceil(camera.x + halfWUnits) + 2;
-    const bottom = Math.floor(camera.y - halfHUnits) - 2;
-    const top = Math.ceil(camera.y + halfHUnits) + 2;
+function drawGrid() {
+  const w = canvas.clientWidth; const h = canvas.clientHeight;
+  const halfWUnits = (w / 2) / (baseGridPx * scale);
+  const halfHUnits = (h / 2) / (baseGridPx * scale);
+  const left = Math.floor(camera.x - halfWUnits) - 2;
+  const right = Math.ceil(camera.x + halfWUnits) + 2;
+  const bottom = Math.floor(camera.y - halfHUnits) - 2;
+  const top = Math.ceil(camera.y + halfHUnits) + 2;
 
-    // Draw minor grid lines
-    ctx.lineWidth = 1; ctx.globalAlpha = 0.55; ctx.strokeStyle = '#222';
-    for(let x=left;x<=right;x++){
-      const sx = Math.round(worldToScreen(x,0).x)+0.5;
-      ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx,h); ctx.stroke();
-    }
-    for(let y=bottom;y<=top;y++){
-      const sy = Math.round(worldToScreen(0,y).y)+0.5;
-      ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(w,sy); ctx.stroke();
-    }
+  // Draw minor grid lines
+  ctx.lineWidth = 1; ctx.globalAlpha = 0.55; ctx.strokeStyle = '#222';
+  for (let x = left; x <= right; x++) {
+    const sx = Math.round(worldToScreen(x, 0).x) + 0.5;
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+  }
+  for (let y = bottom; y <= top; y++) {
+    const sy = Math.round(worldToScreen(0, y).y) + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
+  }
 
-    // Draw X and Y axes thicker
-    ctx.globalAlpha = 1; ctx.lineWidth = 1.8; ctx.strokeStyle = '#000';
-    const axisX = Math.round(worldToScreen(0,0).x)+0.5; ctx.beginPath(); ctx.moveTo(axisX,0); ctx.lineTo(axisX,h); ctx.stroke();
-    const axisY = Math.round(worldToScreen(0,0).y)+0.5; ctx.beginPath(); ctx.moveTo(0,axisY); ctx.lineTo(w,axisY); ctx.stroke();
+  // Draw X and Y axes thicker
+  ctx.globalAlpha = 1; ctx.lineWidth = 1.8; ctx.strokeStyle = '#000';
+  const axisX = Math.round(worldToScreen(0, 0).x) + 0.5; ctx.beginPath(); ctx.moveTo(axisX, 0); ctx.lineTo(axisX, h); ctx.stroke();
+  const axisY = Math.round(worldToScreen(0, 0).y) + 0.5; ctx.beginPath(); ctx.moveTo(0, axisY); ctx.lineTo(w, axisY); ctx.stroke();
 }
 
 
 
 // drawColoredPolygon(points, color): provided drawing function
-export function drawColoredPolygon(points, color="#808080") {
-    if (points.length < 3) return; // need at least a triangle
+export function drawColoredPolygon(points, color = "#808080") {
+  if (points.length < 3) return; // need at least a triangle
 
-    // Convert all world points to screen coordinates
-    const screenPoints = points.map(([wx, wy]) => worldToScreen(wx, wy));
+  // Convert all world points to screen coordinates
+  const screenPoints = points.map(([wx, wy]) => worldToScreen(wx, wy));
 
-    ctx.save();
-    ctx.beginPath();
+  ctx.save();
+  ctx.beginPath();
 
-    // Move to the first point
-    ctx.moveTo(screenPoints[0].x, screenPoints[0].y);
-    // Draw lines between all points
-    for (let i = 1; i < screenPoints.length; i++) {
-      ctx.lineTo(screenPoints[i].x, screenPoints[i].y);
-    }
-    // Close the shape
-    ctx.closePath();
+  // Move to the first point
+  ctx.moveTo(screenPoints[0].x, screenPoints[0].y);
+  // Draw lines between all points
+  for (let i = 1; i < screenPoints.length; i++) {
+    ctx.lineTo(screenPoints[i].x, screenPoints[i].y);
+  }
+  // Close the shape
+  ctx.closePath();
 
-    // Fill (transparent)
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle = color;
-    ctx.fill();
+  // Fill (transparent)
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = color;
+  ctx.fill();
 
-    // Stroke (thicker and slightly less transparent)
-    ctx.globalAlpha = 0.6;
-    ctx.lineWidth = 4 * scale; // scales with zoom
-    ctx.strokeStyle = color;
-    ctx.stroke();
+  // Stroke (thicker and slightly less transparent)
+  ctx.globalAlpha = 0.6;
+  ctx.lineWidth = 4 * scale; // scales with zoom
+  ctx.strokeStyle = color;
+  ctx.stroke();
 
-    ctx.restore();
+  ctx.restore();
 }
 
 
 
 // === SHAPE DRAWING HELPERS ===
-function drawShapeAtWorld(x,y,size,shape,color,fill=true){
-    const p = worldToScreen(x,y);
-    drawShapeAtScreen(p.x,p.y,size*baseGridPx*scale,shape,color,fill);
+function drawShapeAtWorld(x, y, size, shape, color, fill = true) {
+  const p = worldToScreen(x, y);
+  drawShapeAtScreen(p.x, p.y, size * baseGridPx * scale, shape, color, fill);
 }
 
 
 
 function drawShapeAtScreen(cx, cy, pxSize, shape, color, fill = true) {
-    const r = pxSize / 2;
-    ctx.beginPath();
-    ctx.fillStyle = color;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(1, pxSize * 0.08);
+  const r = pxSize / 2;
+  ctx.beginPath();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, pxSize * 0.08);
 
-    // Helper to draw regular polygons
-    const drawPolygon = (sides, rotation = -Math.PI / 2) => {
+  // Helper to draw regular polygons
+  const drawPolygon = (sides, rotation = -Math.PI / 2) => {
+    ctx.beginPath();
+    for (let i = 0; i < sides; i++) {
+      const angle = rotation + (i * 2 * Math.PI) / sides;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    fill ? ctx.fill() : ctx.stroke();
+  };
+
+  switch (shape) {
+    case 'circle':
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      fill ? ctx.fill() : ctx.stroke();
+      break;
+
+    case 'square':
+      ctx.rect(cx - r, cy - r, 2 * r, 2 * r);
+      fill ? ctx.fill() : ctx.stroke();
+      break;
+
+    case 'triangle':
+      drawPolygon(3);
+      break;
+
+    case 'pentagon':
+      drawPolygon(5);
+      break;
+
+    case 'hexagon':
+      drawPolygon(6);
+      break;
+
+    case 'octagon':
+      drawPolygon(8);
+      break;
+
+    case 'star': {
+      const spikes = 5;
+      const outerRadius = r;
+      const innerRadius = r * 0.5;
+      let rot = -Math.PI / 2;
       ctx.beginPath();
-      for (let i = 0; i < sides; i++) {
-        const angle = rotation + (i * 2 * Math.PI) / sides;
-        const x = cx + r * Math.cos(angle);
-        const y = cy + r * Math.sin(angle);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      for (let i = 0; i < spikes; i++) {
+        const xOuter = cx + Math.cos(rot) * outerRadius;
+        const yOuter = cy + Math.sin(rot) * outerRadius;
+        ctx.lineTo(xOuter, yOuter);
+        rot += Math.PI / spikes;
+        const xInner = cx + Math.cos(rot) * innerRadius;
+        const yInner = cy + Math.sin(rot) * innerRadius;
+        ctx.lineTo(xInner, yInner);
+        rot += Math.PI / spikes;
       }
       ctx.closePath();
       fill ? ctx.fill() : ctx.stroke();
-    };
-
-    switch (shape) {
-      case 'circle':
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        fill ? ctx.fill() : ctx.stroke();
-        break;
-
-      case 'square':
-        ctx.rect(cx - r, cy - r, 2 * r, 2 * r);
-        fill ? ctx.fill() : ctx.stroke();
-        break;
-
-      case 'triangle':
-        drawPolygon(3);
-        break;
-
-      case 'pentagon':
-        drawPolygon(5);
-        break;
-
-      case 'hexagon':
-        drawPolygon(6);
-        break;
-
-      case 'octagon':
-        drawPolygon(8);
-        break;
-
-      case 'star': {
-        const spikes = 5;
-        const outerRadius = r;
-        const innerRadius = r * 0.5;
-        let rot = -Math.PI / 2;
-        ctx.beginPath();
-        for (let i = 0; i < spikes; i++) {
-          const xOuter = cx + Math.cos(rot) * outerRadius;
-          const yOuter = cy + Math.sin(rot) * outerRadius;
-          ctx.lineTo(xOuter, yOuter);
-          rot += Math.PI / spikes;
-          const xInner = cx + Math.cos(rot) * innerRadius;
-          const yInner = cy + Math.sin(rot) * innerRadius;
-          ctx.lineTo(xInner, yInner);
-          rot += Math.PI / spikes;
-        }
-        ctx.closePath();
-        fill ? ctx.fill() : ctx.stroke();
-        break;
-      }
-
-      case 'cross': {
-        const arm = r * 1;
-        const t = r * 0.35;
-        ctx.beginPath();
-        ctx.moveTo(cx - t, cy - arm);
-        ctx.lineTo(cx + t, cy - arm);
-        ctx.lineTo(cx + t, cy - t);
-        ctx.lineTo(cx + arm, cy - t);
-        ctx.lineTo(cx + arm, cy + t);
-        ctx.lineTo(cx + t, cy + t);
-        ctx.lineTo(cx + t, cy + arm);
-        ctx.lineTo(cx - t, cy + arm);
-        ctx.lineTo(cx - t, cy + t);
-        ctx.lineTo(cx - arm, cy + t);
-        ctx.lineTo(cx - arm, cy - t);
-        ctx.lineTo(cx - t, cy - t);
-        ctx.closePath();
-        fill ? ctx.fill() : ctx.stroke();
-        break;
-      }
-
-      default:
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        fill ? ctx.fill() : ctx.stroke();
-        break;
+      break;
     }
+
+    case 'cross': {
+      const arm = r * 1;
+      const t = r * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(cx - t, cy - arm);
+      ctx.lineTo(cx + t, cy - arm);
+      ctx.lineTo(cx + t, cy - t);
+      ctx.lineTo(cx + arm, cy - t);
+      ctx.lineTo(cx + arm, cy + t);
+      ctx.lineTo(cx + t, cy + t);
+      ctx.lineTo(cx + t, cy + arm);
+      ctx.lineTo(cx - t, cy + arm);
+      ctx.lineTo(cx - t, cy + t);
+      ctx.lineTo(cx - arm, cy + t);
+      ctx.lineTo(cx - arm, cy - t);
+      ctx.lineTo(cx - t, cy - t);
+      ctx.closePath();
+      fill ? ctx.fill() : ctx.stroke();
+      break;
+    }
+
+    default:
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      fill ? ctx.fill() : ctx.stroke();
+      break;
+  }
 }
 
 
@@ -241,19 +238,17 @@ function drawShapeAtScreen(cx, cy, pxSize, shape, color, fill = true) {
 
 
 
-  // === COORDINATE CONVERSION FUNCTIONS ===
-  function worldToScreen(wx, wy){
-    const cx = canvas.clientWidth/2;
-    const cy = canvas.clientHeight/2;
-    return { x: cx + (wx - camera.x) * baseGridPx * scale, y: cy - (wy - camera.y) * baseGridPx * scale };
-  }
-  export function screenToWorld(sx, sy){
-    const cx = canvas.clientWidth/2;
-    const cy = canvas.clientHeight/2;
-    return { x: camera.x + (sx - cx) / (baseGridPx * scale), y: camera.y - (sy - cy) / (baseGridPx * scale) };
-  }
-
-
+// === COORDINATE CONVERSION FUNCTIONS ===
+function worldToScreen(wx, wy) {
+  const cx = canvas.clientWidth / 2;
+  const cy = canvas.clientHeight / 2;
+  return { x: cx + (wx - camera.x) * baseGridPx * scale, y: cy - (wy - camera.y) * baseGridPx * scale };
+}
+export function screenToWorld(sx, sy) {
+  const cx = canvas.clientWidth / 2;
+  const cy = canvas.clientHeight / 2;
+  return { x: camera.x + (sx - cx) / (baseGridPx * scale), y: camera.y - (sy - cy) / (baseGridPx * scale) };
+}
 
 
 
@@ -315,4 +310,3 @@ function drawUniformBorderShadow(ctx, color = "#000000", strength = 0.3, sizeCss
 
   ctx.restore();
 }
-
