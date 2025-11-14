@@ -1,0 +1,91 @@
+html,body{
+    height:100%;
+    margin:0;
+    overflow:hidden}
+
+canvas {
+    display:block;
+    width:100%;
+    height:100%;
+    background:#ffffff;
+    touch-action:none
+}
+
+#controls {
+    position:fixed;
+    left:12px;top:12px;
+    display:flex;
+    gap:8px;
+    z-index:20
+}
+  
+.btn {
+    width:40px;
+    height:40px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#fff;
+    border:1px solid #ccc;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:18px;
+    box-shadow:0 3px 8px rgba(0,0,0,0.08);
+    user-select:none
+}
+
+    #popup {
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.35);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:30;
+    }
+    
+    .modal {
+      background:#fff;
+      padding:18px;border-radius:10px;
+      max-width:520px;
+      width:90%;
+      box-shadow:0 8px 30px rgba(0,0,0,0.2);
+      position:relative;
+      font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;
+      color:#111;
+    }
+
+    .modal h2{
+        margin:0 0 8px 0
+    }
+
+    .closeX{
+        position:absolute;
+        right:12px;
+        top:8px;
+        cursor:pointer;
+        font-size:20px
+    }
+
+    #errToast{
+        position:fixed;
+        left:50%;
+        transform:translateX(-50%);
+        bottom:18px;
+        background:#fff;
+        padding:8px 12px;border-radius:8px;
+        border:1px solid #f44336;
+        color:#f44336;display:none;
+        z-index:60
+    }
+
+    #coordBox{
+        position:fixed;
+        right:12px;
+        bottom:12px;
+        padding:6px 8px;
+        background:rgba(255,255,255,0.9);
+        border:1px solid #eee;
+        border-radius:8px;
+        font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;font-size:13px}
+  

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Atary</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+
+  <div id="controls">
+    <div id="infoBtn" class="btn">ℹ️</div>
+  </div>
+
+  <!-- Info Modal -->
+  <div id="popup">
+    <div class="modal" id="infoModal">
+      <div id="closeInfo" class="closeX">❌</div>
+      <h2>Controls & Instructions</h2>
+      <div>
+        <ul>
+          <li>Left click / tap: place a point (snaps to nearest grid intersection)</li>
+          <li>Alternating players: Player 1 then Player 2, continuously</li>
+          <li>Can't place where a ball already exists</li>
+          <li>Right-click + drag or touch swipe: pan the grid</li>
+          <li>Mouse wheel or + / - keys: zoom (balls scale with zoom)</li>
+          <li>Ctrl+Z: Undo, Ctrl+Y: Redo</li>
+          <li>R: Reset view</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div id="errToast">Importing error.</div>
+  <div id="coordBox">x: 0.00, y: 0.00, zoom: 1.00</div>
+
+  <script src="./index.js" type="module"></script>
+</body>
+
+</html>
